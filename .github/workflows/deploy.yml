@@ -1,0 +1,56 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      # Step 2: up Docker
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      # Step 3: Log in to Amazon ECR
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: us-east-2
+
+      # Step 4: Build and Push Backend Docker Image
+      - name: Build and Push Backend Docker Image
+        run: |
+          docker build -t ${{ secrets.ECR_BACKEND }}:latest ./backend
+          docker push ${{ secrets.ECR_BACKEND }}:latest
+
+      # Step 5: Build and Push Frontend Docker Image
+      - name: Build and Push Frontend Docker Image
+        run: |
+          docker build -t ${{ secrets.ECR_FRONTEND }}:latest ./frontend
+          docker push ${{ secrets.ECR_FRONTEND }}:latest
+
+      # Step 6: Configure AWS CLI for EKS
+      - name: Configure AWS CLI
+        run: |
+          aws eks --region us-east-1 update-kubeconfig --name cluster
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # Step 7: Apply Backend Kubernetes Config
+      - name: Apply Backend Kubernetes Config
+        run: |
+          kubectl apply -f k8s/backend-deployment.yaml --validate=false
+
+      # Step 8: Apply Frontend Kubernetes Config
+      - name: Apply Frontend Kubernetes Config
+        run: |
+          kubectl apply -f k8s/frontend-deployment.yaml --validate=false
