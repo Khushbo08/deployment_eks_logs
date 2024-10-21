@@ -4,6 +4,10 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install
 COPY . .
+
+# Fix permissions for the node_modules binaries (including react-scripts)
+RUN chmod -R 777 /app/node_modules/.bin
+
 RUN npm run build
 
 FROM nginx:alpine
